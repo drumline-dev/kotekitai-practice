@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#2b5fab">
+<title>鼓笛隊れんしゅう</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 合言葉の画面 -->
+<section id="login" class="screen center" hidden>
+  <form id="loginForm" class="card">
+    <h1>🥁 鼓笛隊れんしゅう</h1>
+    <p>合言葉を入れてね</p>
+    <!-- 日本語の合言葉を入力できるよう type="text" にしている（password だと日本語入力ができない端末がある） -->
+    <input id="pass" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="合言葉">
+    <button type="submit" class="primary">はじめる</button>
+    <p id="loginError" class="error" aria-live="polite"></p>
+  </form>
+</section>
+
+<!-- 曲えらびの画面 -->
+<section id="songs" class="screen center" hidden>
+  <div class="card wide">
+    <h1>曲をえらんでね</h1>
+    <ul id="songList" class="song-list"></ul>
+  </div>
+</section>
+
+<!-- 練習の画面 -->
+<section id="practice" class="screen" hidden>
+  <header class="topbar">
+    <button id="backBtn" type="button">◀ 曲</button>
+    <h2 id="songTitle"></h2>
+    <select id="partSelect" aria-label="パート"></select>
+    <button id="settingsBtn" type="button" aria-label="せってい">⚙ せってい</button>
+  </header>
+
+  <div id="scoreWrap"><div id="score"></div></div>
+
+  <div class="controls">
+    <button id="rewindBtn" type="button" aria-label="さいしょへ">⏮</button>
+    <button id="playBtn" type="button" class="primary play" aria-label="さいせい">▶</button>
+    <select id="startSelect" aria-label="演奏を始める場所"></select>
+    <div class="bpm" role="group" aria-label="はやさ">
+      <span class="bpm-note">♩=</span>
+      <button id="bpmDown" type="button" aria-label="おそくする">－</button>
+      <input id="bpm" type="number" inputmode="numeric" min="30" max="240" step="1" value="100" aria-label="BPM">
+      <button id="bpmUp" type="button" aria-label="はやくする">＋</button>
+      <button id="bpmOrig" type="button" class="link" title="楽譜のはやさにもどす"></button>
+    </div>
+    <button id="loopBtn" type="button" class="toggle" aria-pressed="false">🔁 くり返し</button>
+    <span id="measureLabel" class="measure"></span>
+  </div>
+
+  <div id="keyboard" aria-label="けんばん"></div>
+
+  <div id="settings" class="panel" hidden>
+    <div class="panel-body">
+      <h3>せってい</h3>
+      <fieldset>
+        <legend>鳴らす音</legend>
+        <label><input type="radio" name="mode" value="own" checked> <span id="modeOwnLabel">お手本（自分のパートだけ）</span></label>
+        <label><input type="radio" name="mode" value="all"> 全体の演奏</label>
+        <label><input type="radio" name="mode" value="accomp"> 伴奏だけ（自分のパートは鳴らさない）</label>
+      </fieldset>
+      <label class="row"><input id="metronome" type="checkbox"> メトロノームを鳴らす</label>
+      <div class="row">くり返す範囲：
+        <select id="loopFrom"></select> 小節目から
+        <select id="loopTo"></select> 小節目まで
+      </div>
+      <label class="row"><input id="doremi" type="checkbox"> 鍵盤に「ドレミ」を表示する</label>
+      <div class="row">楽譜の大きさ：
+        <button id="zoomOut" type="button">－</button>
+        <button id="zoomIn" type="button">＋</button>
+      </div>
+      <button id="settingsClose" type="button" class="primary">とじる</button>
+    </div>
+  </div>
+
+  <div id="rotate">📱↻<br>スマホを横向きにしてね</div>
+</section>
+
+<div id="loading" class="loading" hidden>よみこみ中…</div>
+<p id="fatal" class="fatal" hidden></p>
+
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.9/build/opensheetmusicdisplay.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
