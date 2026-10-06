@@ -644,12 +644,6 @@ const DOREMI = ['ド', 'ド#', 'レ', 'レ#', 'ミ', 'ファ', 'ファ#', 'ソ',
 const isBlack = (m) => [1, 3, 6, 8, 10].includes(((m % 12) + 12) % 12);
 let keyEls = new Map(); // midi → 要素
 
-function countWhites(lo, hi) {
-  let c = 0;
-  for (let m = lo; m <= hi; m++) if (!isBlack(m)) c++;
-  return c;
-}
-
 function buildKeyboard() {
   const kb = $('keyboard');
   kb.innerHTML = '';
@@ -660,11 +654,14 @@ function buildKeyboard() {
     return;
   }
   kb.hidden = false;
-  // 曲で使う音のまわりだけを表示する（左はド・ファ、右はミ・シの区切りまで広げ、白鍵は最低8つ）
+  // 左端は曲の一番低い音から下にさがって「ド」か「ファ」（鍵盤ハーモニカの左端はファ）。
+  // そこから最低2オクターブ（白鍵15個）を表示し、曲の音域がもっと広ければ「ド」か「ファ」まで広げる
   const pc = (m) => ((m % 12) + 12) % 12;
-  let lo = part.min ?? 60, hi = part.max ?? 72;
+  let lo = part.min ?? 60;
+  const top = part.max ?? 72;
   while (pc(lo) !== 0 && pc(lo) !== 5) lo--;
-  do { while (pc(hi) !== 4 && pc(hi) !== 11) hi++; } while (countWhites(lo, hi) < 8 && ++hi);
+  let hi = lo + 24;
+  if (top > hi) { hi = top; while (pc(hi) !== 0 && pc(hi) !== 5) hi++; }
 
   const whites = [];
   for (let m = lo; m <= hi; m++) if (!isBlack(m)) whites.push(m);
