@@ -78,7 +78,21 @@ python -m http.server 8765 --directory .
 
 ## 🌐 公開（子どもに配る）について
 
-GitHub Pages（無料）で公開する予定。手順はアカウント作成後に一緒に進める。
+GitHub Pages（無料）で公開中。
 
-- 公開すると `https://（アカウント名）.github.io/（名前）/?song=kirakira` のような URL になる
-- この URL を QR コードにして配る
+| 項目 | 内容 |
+|---|---|
+| 公開 URL | https://drumline-dev.github.io/kotekitai-practice/ |
+| リポジトリ | https://github.com/drumline-dev/kotekitai-practice |
+| 曲を直接開く URL | 公開 URL の後ろに `?song=曲のID` を付ける（例：`?song=kirakira`） |
+| 配布用 QR コード | `プライベート用/鼓笛隊/配布用/案内カード_QR.png` |
+
+### 更新を公開する手順
+
+このフォルダで次を実行する（1〜2分で公開ページに反映される）。
+
+```powershell
+git add -A
+git commit -m "変更内容のメモ"
+git push
+```
