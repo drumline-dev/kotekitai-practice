@@ -156,6 +156,65 @@ button.link:empty { display: none; }
 .key.good { box-shadow: inset 0 0 0 4px var(--good); }
 .key.miss { box-shadow: inset 0 0 0 4px var(--miss); }
 
+/* ---------- 打楽器パッド ---------- */
+#pads {
+  flex: 0 0 38%;
+  min-height: 110px;
+  max-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #3a3f47;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden; /* 予告の輪が上の欄にはみ出さないように */
+}
+#pads[hidden] { display: none; }
+.pad {
+  --rim: 3px;
+  position: relative;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: var(--rim) solid #8a8f98;
+  background: #8a8f98;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.pad.has-rim, .pad.rim-pad { border-color: #c3c8d0; background: #c3c8d0; }
+.pad-head {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #ffffff, #e3e3e3 70%, #cfcfcf);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #333; font-weight: bold; text-align: center; line-height: 1.2;
+  pointer-events: none;
+}
+.pad.rim-pad .pad-head { background: #3a3f47; color: #ddd; } /* フチ専用パッドはドーナツ形 */
+.pad-label { padding: 0 6px; }
+.pad-accent { display: none; color: var(--miss); font-size: 1.6em; line-height: 1; }
+.pad.accent-show .pad-accent { display: block; }
+.pad.on .pad-head { background: var(--on); }
+.pad.on.accent .pad-head { background: var(--miss); color: #fff; }
+.pad.on.accent .pad-accent { color: #fff; }
+.pad.rim-on { border-color: var(--on); background: var(--on); }
+.pad.rim-pad.on { border-color: var(--on); background: var(--on); }
+.pad.pressed .pad-head { filter: brightness(.85); }
+.pad.good { box-shadow: 0 0 0 6px var(--good); }
+.pad.miss { box-shadow: 0 0 0 6px var(--miss); }
+.pad-ring {
+  position: absolute;
+  inset: calc(-1 * var(--rim));
+  border-radius: 50%;
+  border: 4px solid var(--on);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.pad-ring.to-rim { border-style: dashed; border-color: #ffd36b; }
+
 /* ---------- せってい ---------- */
 .panel {
   position: fixed; inset: 0;
