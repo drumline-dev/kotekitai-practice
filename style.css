@@ -163,47 +163,87 @@ button.link:empty { display: none; }
   justify-content: center;
   gap: 12px;
   padding: 10px 12px;
-  background: #3a3f47;
+  background: radial-gradient(ellipse at 50% 30%, #3b414b, #1d2026 75%);
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   overflow: hidden;
 }
 #pads[hidden] { display: none; }
-/* テナードラム: パッドを自由な位置に置くので、欄を広めにとる */
+/* テナードラム: 太鼓を自由な位置に置く */
 #pads.tenor { display: block; position: relative; flex-basis: 52%; max-height: 380px; }
 #pads.tenor .pad { position: absolute; }
+
 .pad {
-  --rim: 3px;
   position: relative;
   flex: 0 0 auto;
   border-radius: 50%;
-  border: var(--rim) solid #8a8f98;
-  background: #8a8f98;
-  box-sizing: border-box;
   cursor: pointer;
+  filter: drop-shadow(0 5px 7px rgba(0, 0, 0, .55));
 }
-.pad.has-rim, .pad.rim-pad { border-color: #c3c8d0; background: #c3c8d0; }
-.pad-head {
+.pad svg { display: block; width: 100%; height: 100%; transition: transform .06s; }
+.pad.pressed svg { transform: scale(.96); }
+.pad .glow-head { fill: var(--on); opacity: 0; transition: opacity .05s; }
+.pad .glow-rim { stroke: var(--on); opacity: 0; transition: opacity .05s; }
+.pad.on .glow-head { opacity: .82; }
+.pad.on.accent .glow-head { fill: var(--miss); opacity: .9; }
+.pad.rim-on .glow-rim { opacity: 1; }
+.pad.rim-pad.on .glow-rim { opacity: 1; }
+.pad.cymbal.on .glow-head { opacity: .55; }
+
+.pad-text {
   position: absolute; inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 35%, #ffffff, #e3e3e3 70%, #cfcfcf);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  color: #333; font-weight: bold; text-align: center; line-height: 1.2;
+  color: rgba(40, 40, 40, .55);
+  font-weight: bold; text-align: center; line-height: 1.1;
   pointer-events: none;
 }
-.pad.rim-pad .pad-head { background: #3a3f47; color: #ddd; } /* フチ専用パッドはドーナツ形 */
+.pad.cymbal .pad-text { color: rgba(80, 50, 0, .55); justify-content: flex-end; padding-bottom: 14%; } /* 真ん中のカップをよける */
+.pad.rim-pad .pad-text { color: #ccc; }
+.pad.on .pad-text { color: #fff; }
 .pad-label { padding: 0 6px; }
-.pad-accent { display: none; color: var(--miss); font-size: 1.6em; line-height: 1; }
-.pad.accent .pad-accent { display: block; }
-.pad.on .pad-head { background: var(--on); }
-.pad.on.accent .pad-head { background: var(--miss); color: #fff; }
-.pad.on.accent .pad-accent { color: #fff; }
-.pad.rim-on { border-color: var(--on); background: var(--on); }
-.pad.rim-pad.on { border-color: var(--on); background: var(--on); }
-.pad.pressed .pad-head { filter: brightness(.85); }
+.pad-accent { display: none; color: var(--miss); font-size: 1.5em; line-height: 1; }
+.pad.accent .pad-accent { display: block; color: #fff; }
 .pad.good { box-shadow: 0 0 0 6px var(--good); }
 .pad.miss { box-shadow: 0 0 0 6px var(--miss); }
+
+/* ---------- 打楽器のときの画面の配置 ---------- */
+.sidebar { display: none; }
+#practice.perc {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  grid-template-rows: auto 1fr;
+}
+#practice.perc .topbar,
+#practice.perc .controls,
+#practice.perc #keyboard,
+#practice.perc .doremi-row { display: none; }
+#practice.perc .sidebar {
+  grid-column: 1; grid-row: 1 / 3;
+  display: flex; flex-direction: column; align-items: stretch; justify-content: space-between;
+  gap: 4px;
+  padding: 4px;
+  background: var(--card);
+  border-right: 1px solid var(--line);
+}
+.sidebar button { padding: 4px 0; min-height: 30px; font-size: 1rem; }
+.sb-bpm { display: flex; flex-direction: column; align-items: stretch; gap: 2px; text-align: center; }
+.sb-bpm span { font-size: .8rem; }
+.sb-measure { font-size: .7rem; color: var(--muted); text-align: center; }
+#practice.perc #scoreWrap {
+  grid-column: 2; grid-row: 1;
+  min-height: 0;
+  max-height: 96px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none; /* 横のスクロールバーは出さない（演奏に合わせて自動で流れる） */
+}
+#practice.perc #scoreWrap::-webkit-scrollbar { display: none; }
+#practice.perc #pads {
+  grid-column: 2; grid-row: 2;
+  max-height: none;
+  min-height: 0;
+}
 
 /* ---------- せってい ---------- */
 .panel {

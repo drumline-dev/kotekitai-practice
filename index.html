@@ -32,6 +32,21 @@
 
 <!-- 練習の画面 -->
 <section id="practice" class="screen" hidden>
+  <!-- 打楽器のときだけ出る、左の縦ならびのボタン（中身は下のボタンと同じ働き） -->
+  <nav id="sidebar" class="sidebar" aria-label="そうさ">
+    <button id="sbBack" type="button" aria-label="曲えらびにもどる">◀</button>
+    <button id="sbRewind" type="button" aria-label="さいしょへ">⏮</button>
+    <button id="sbPlay" type="button" class="primary" aria-label="さいせい">▶</button>
+    <div class="sb-bpm">
+      <button id="sbBpmUp" type="button" aria-label="はやくする">＋</button>
+      <span id="sbBpm">♩100</span>
+      <button id="sbBpmDown" type="button" aria-label="おそくする">－</button>
+    </div>
+    <button id="sbLoop" type="button" class="toggle" aria-pressed="false" aria-label="くり返し">🔁</button>
+    <button id="sbSettings" type="button" aria-label="せってい">⚙</button>
+    <span id="sbMeasure" class="sb-measure"></span>
+  </nav>
+
   <header class="topbar">
     <button id="backBtn" type="button">◀ 曲</button>
     <h2 id="songTitle"></h2>
@@ -62,6 +77,11 @@
   <div id="settings" class="panel" hidden>
     <div class="panel-body">
       <h3>せってい</h3>
+      <!-- 打楽器のときは、パートと始める場所の選択をここに移す -->
+      <div id="percRows" hidden>
+        <div class="row">パート：<span id="partSlot"></span></div>
+        <div class="row">始める場所：<span id="startSlot"></span></div>
+      </div>
       <fieldset>
         <legend>鳴らす音</legend>
         <label><input type="radio" name="mode" value="own" checked> <span id="modeOwnLabel">お手本（自分のパートだけ）</span></label>
@@ -73,7 +93,7 @@
         <select id="loopFrom"></select> 小節目から
         <select id="loopTo"></select> 小節目まで
       </div>
-      <label class="row"><input id="doremi" type="checkbox"> 鍵盤に「ドレミ」を表示する</label>
+      <label class="row doremi-row"><input id="doremi" type="checkbox"> 鍵盤に「ドレミ」を表示する</label>
       <div class="row">楽譜の大きさ：
         <button id="zoomOut" type="button">－</button>
         <button id="zoomIn" type="button">＋</button>
@@ -84,6 +104,28 @@
 
   <div id="rotate">📱↻<br>スマホを横向きにしてね</div>
 </section>
+
+<!-- 太鼓の絵に使う色（グラデーション） -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <radialGradient id="g-head" cx="45%" cy="40%" r="65%">
+      <stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#f2f0ea"/><stop offset="1" stop-color="#d8d4cc"/>
+    </radialGradient>
+    <linearGradient id="g-chrome" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7f9fb"/><stop offset=".3" stop-color="#9aa1aa"/><stop offset=".5" stop-color="#eef1f4"/>
+      <stop offset=".72" stop-color="#7b828b"/><stop offset="1" stop-color="#d9dde2"/>
+    </linearGradient>
+    <linearGradient id="g-hoop-dark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4a6fb3"/><stop offset=".45" stop-color="#1d3566"/><stop offset=".55" stop-color="#3a5d9e"/><stop offset="1" stop-color="#14264a"/>
+    </linearGradient>
+    <radialGradient id="g-bronze" cx="42%" cy="38%" r="70%">
+      <stop offset="0" stop-color="#f8e39a"/><stop offset=".55" stop-color="#d6a844"/><stop offset="1" stop-color="#a5771d"/>
+    </radialGradient>
+    <radialGradient id="g-bell" cx="40%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#fbeab0"/><stop offset="1" stop-color="#c39431"/>
+    </radialGradient>
+  </defs>
+</svg>
 
 <div id="loading" class="loading" hidden>よみこみ中…</div>
 <p id="fatal" class="fatal" hidden></p>

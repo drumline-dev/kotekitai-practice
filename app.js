@@ -664,9 +664,37 @@ async function openSong(entry) {
   }
 }
 
+// 打楽器のパートのときは、ボタンを左に縦ならび・楽譜を1段の帯にして、太鼓を大きく出す
+const isPercMode = () => !!(state.song && state.song.parts[state.partIdx].perc);
+const scoreZoom = () => (isPercMode() ? prefs.zoom * 0.7 : prefs.zoom);
+const slots = new Map(); // 動かした選択欄の元の場所
+
+function moveTo(el, parent) {
+  if (!slots.has(el)) slots.set(el, { parent: el.parentNode, next: el.nextSibling });
+  parent.appendChild(el);
+}
+function moveBack(el) {
+  const s = slots.get(el);
+  if (s) s.parent.insertBefore(el, s.next);
+}
+
+function setPercMode(on) {
+  $('practice').classList.toggle('perc', on);
+  $('percRows').hidden = !on;
+  if (on) {
+    moveTo($('partSelect'), $('partSlot'));
+    moveTo($('startSelect'), $('startSlot'));
+  } else {
+    moveBack($('partSelect'));
+    moveBack($('startSelect'));
+  }
+  osmd.setOptions({ renderSingleHorizontalStaffline: on });
+}
+
 async function renderScore() {
+  setPercMode(isPercMode());
   await osmd.load(partXml(state.song, state.partIdx));
-  osmd.zoom = prefs.zoom;
+  osmd.zoom = scoreZoom();
   osmd.render();
   osmd.cursor.show();
   cursor.reset();
@@ -718,6 +746,14 @@ const cursor = {
     const el = osmd.cursor.cursorElement;
     const wrap = $('scoreWrap');
     if (!el) return;
+    if (isPercMode()) {
+      // 1段の帯: 今の位置が左から3分の1あたりに来るよう横に流す
+      const left = el.offsetLeft;
+      if (left < wrap.scrollLeft + 20 || left > wrap.scrollLeft + wrap.clientWidth * 0.6) {
+        wrap.scrollTo({ left: Math.max(0, left - wrap.clientWidth / 3), behavior: 'smooth' });
+      }
+      return;
+    }
     const top = el.offsetTop;
     const h = el.offsetHeight || 60;
     if (top < wrap.scrollTop || top + h > wrap.scrollTop + wrap.clientHeight) {
@@ -854,6 +890,34 @@ let padEls = []; // { el }
 const PAD_FLASH = 0.25; // パッドが光っている長さ（拍）
 const RIM_RATIO = 0.16; // パッドの半径のうちフチの太さ
 
+// 上から見た太鼓の絵（SVG）。フープ（フチ）は半径 42〜50、ヘッド（皮）は半径 42 まで
+// → フチの太さは RIM_RATIO（0.16）と合わせてある
+function drumSvg(pad) {
+  let s = '<svg viewBox="0 0 100 100" aria-hidden="true">';
+  if (pad.kind === 'cymbal') {
+    s += '<circle cx="50" cy="50" r="49.5" fill="url(#g-bronze)"/>';
+    for (const r of [45, 39, 33, 27, 21]) s += `<circle cx="50" cy="50" r="${r}" fill="none" stroke="rgba(110,70,10,.28)" stroke-width=".7"/>`;
+    s += '<circle cx="50" cy="50" r="14" fill="url(#g-bell)"/><circle cx="50" cy="50" r="2.6" fill="#5b4312"/>';
+    s += '<circle class="glow-head" cx="50" cy="50" r="49.5"/>';
+    return s + '</svg>';
+  }
+  const dark = pad.kind === 'bassdrum';
+  s += `<circle cx="50" cy="50" r="49.5" fill="url(#${dark ? 'g-hoop-dark' : 'g-chrome'})"/>`;
+  // 皮を張る金具（テンションボルト）
+  const lugs = dark ? 12 : 10;
+  for (let i = 0; i < lugs; i++) {
+    const a = (i + 0.5) / lugs * Math.PI * 2;
+    s += `<circle cx="${(50 + Math.cos(a) * 46).toFixed(2)}" cy="${(50 + Math.sin(a) * 46).toFixed(2)}" r="1.7" fill="${dark ? '#c9d3e6' : '#4b5058'}"/>`;
+  }
+  s += '<circle cx="50" cy="50" r="43" fill="rgba(0,0,0,.28)"/>'; // フープの内側のかげ
+  s += pad.rimPad
+    ? '<circle cx="50" cy="50" r="42" fill="#262a30"/>'
+    : '<circle cx="50" cy="50" r="42" fill="url(#g-head)"/><circle cx="50" cy="50" r="36" fill="none" stroke="rgba(0,0,0,.05)" stroke-width="1"/>';
+  s += '<circle class="glow-head" cx="50" cy="50" r="42"/>';
+  s += '<circle class="glow-rim" cx="50" cy="50" r="46" fill="none" stroke-width="7.5"/>';
+  return s + '</svg>';
+}
+
 function buildPads(part) {
   const box = $('pads');
   box.innerHTML = '';
@@ -865,8 +929,9 @@ function buildPads(part) {
     const el = document.createElement('div');
     el.className = 'pad' + (pad.rimRing ? ' has-rim' : '') + (pad.rimPad ? ' rim-pad' : '');
     el.dataset.pad = i;
-    el.innerHTML = '<div class="pad-head"><span class="pad-accent">＞</span><span class="pad-label"></span></div>';
+    el.innerHTML = drumSvg(pad) + '<span class="pad-text"><span class="pad-accent">＞</span><span class="pad-label"></span></span>';
     el.querySelector('.pad-label').textContent = pad.label;
+    if (pad.kind === 'cymbal') el.classList.add('cymbal');
     box.appendChild(el);
     padEls.push({ el });
   });
@@ -912,7 +977,7 @@ function sizePads() {
   // 横一列: 全部ならび、高さにもおさまる一番大きい円
   const n = padEls.length;
   const size = Math.max(40, Math.min(H - 20, (W - 24 - 12 * (n - 1)) / n));
-  for (const { el } of padEls) place(el, size, null, null, 1 / 6);
+  for (const { el } of padEls) place(el, size, null, null, 1 / 9);
 }
 
 // 位置 q で、今叩くパッドを光らせる
@@ -936,18 +1001,27 @@ function updatePads(q) {
   });
 }
 
+// タップした所から一番近い太鼓（太鼓の外やすき間をタップしても、近い太鼓を叩いたことにする）
+// d: 太鼓の中心からの距離（半径 = 1）
+function padAt(x, y) {
+  let best = null;
+  padEls.forEach(({ el }, i) => {
+    const r = el.getBoundingClientRect();
+    const d = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2)) / (r.width / 2);
+    if (!best || d < best.d) best = { i, el, d };
+  });
+  return best && best.d <= 2.2 ? best : null;
+}
+
 function hitPad(e) {
-  const k = document.elementFromPoint(e.clientX, e.clientY);
-  const el = k && k.closest ? k.closest('.pad') : null;
-  if (!el) return;
+  const hit = padAt(e.clientX, e.clientY);
+  if (!hit) return;
   ensureAudio();
-  const i = Number(el.dataset.pad);
+  const { i, el, d } = hit;
   const part = state.song.parts[state.partIdx];
   const pad = part.pads[i];
-  // フチつきのパッドは、外側の輪をタップしたらリムショット
-  const r = el.getBoundingClientRect();
-  const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
-  const rim = pad.rimPad || (pad.rimRing && dist > (r.width / 2) * (1 - RIM_RATIO));
+  // フチつきの太鼓は、フープ（外側の銀色の輪）のあたりをタップしたらリムショット
+  const rim = pad.rimPad || (pad.rimRing && d > 1 - RIM_RATIO && d <= 1.15);
   playDrum(rim ? 'rim' : pad.kind, ctx.currentTime, 0.6, master, pad.freq);
   el.classList.add('pressed');
   setTimeout(() => el.classList.remove('pressed'), 120);
@@ -1037,7 +1111,7 @@ function startPlayback(fromQ) {
   player.bus = ctx.createGain();
   player.bus.connect(master);
   player.playing = true;
-  $('playBtn').textContent = '⏸';
+  $('playBtn').textContent = $('sbPlay').textContent = '⏸';
   $('playBtn').setAttribute('aria-label', 'とめる');
   schedule();
   player.timer = setInterval(schedule, 25);
@@ -1055,7 +1129,7 @@ function stopPlayback() {
   bus.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
   setTimeout(() => bus.disconnect(), 300);
   if (player.wakeLock) { player.wakeLock.release().catch(() => {}); player.wakeLock = null; }
-  $('playBtn').textContent = '▶';
+  $('playBtn').textContent = $('sbPlay').textContent = '▶';
   $('playBtn').setAttribute('aria-label', 'さいせい');
 }
 
@@ -1124,6 +1198,7 @@ function updateView(q) {
   let sec = '';
   for (const mk of state.song.marks) if (mk.mi <= mi && mk.label.length === 1) sec = mk.label; // 今いる練習記号
   $('measureLabel').textContent = `${sec ? sec + '・' : ''}${ms[mi].num} / ${ms[ms.length - 1].num} 小節`;
+  $('sbMeasure').textContent = `${sec ? sec + '・' : ''}${ms[mi].num}`;
 }
 
 // =====================================================================
@@ -1168,6 +1243,7 @@ let bpmTimer = 0;
 function setBpm(v) {
   state.bpm = Math.min(BPM_MAX, Math.max(BPM_MIN, Math.round(Number(v) || state.bpm)));
   $('bpm').value = state.bpm;
+  $('sbBpm').textContent = '♩' + state.bpm;
   $('bpmOrig').textContent = state.song && state.bpm !== state.song.tempo ? `（楽譜 ${state.song.tempo}）` : '';
 }
 function changeBpm(v) {
@@ -1183,6 +1259,7 @@ $('bpmOrig').addEventListener('click', () => changeBpm(state.song.tempo));
 function updateLoopButton() {
   const b = $('loopBtn');
   b.setAttribute('aria-pressed', String(state.loopOn));
+  $('sbLoop').setAttribute('aria-pressed', String(state.loopOn));
   if (state.loopOn && state.song) {
     const ms = state.song.measures;
     const a = Math.min(state.loopFrom, state.loopTo), z = Math.max(state.loopFrom, state.loopTo);
@@ -1190,6 +1267,12 @@ function updateLoopButton() {
   } else {
     b.textContent = '🔁 くり返し';
   }
+}
+
+// 左の縦ならびのボタンは、ふだんのボタンと同じ働き
+for (const [sb, orig] of [['sbBack', 'backBtn'], ['sbRewind', 'rewindBtn'], ['sbPlay', 'playBtn'],
+  ['sbBpmUp', 'bpmUp'], ['sbBpmDown', 'bpmDown'], ['sbLoop', 'loopBtn'], ['sbSettings', 'settingsBtn']]) {
+  $(sb).addEventListener('click', () => $(orig).click());
 }
 
 $('loopBtn').addEventListener('click', () => {
@@ -1236,9 +1319,10 @@ $('doremi').addEventListener('change', (e) => { prefs.doremi = e.target.checked;
 function rerenderScore() {
   if (!osmd || !osmd.sheet || $('practice').hidden) return;
   const q = currentQ();
-  osmd.zoom = prefs.zoom;
+  osmd.zoom = scoreZoom();
   osmd.render();
   cursor.reset();
+  sizePads();
   updateView(q);
 }
 
