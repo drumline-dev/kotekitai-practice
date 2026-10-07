@@ -144,9 +144,9 @@ function kindFromName(name, perc) {
   return 'soft';
 }
 
-// 打楽器パートの「パッド」（画面の太鼓）を決め、各音がどのパッドかを n.pad に入れる。
-// 五線の位置が低い太鼓（大きい太鼓）を左に並べる。リムショットは、太鼓が1つならそのフチ、
-// 複数ならフチ専用のパッドにする
+// 打楽器パートの「パッド」（画面の太鼓）を決め、各音がどのパッドを光らせるかを n.pads に入れる。
+// 戻り値: { pads, layout }（layout: 'row' = 横一列 / 'tenor' = テナードラムの並び）
+// 太鼓が1つならリムショットはそのフチ、複数ならフチ専用のパッドにする
 function makePads(partName, notes) {
   const drums = new Map();
   for (const n of notes) {
@@ -154,24 +154,57 @@ function makePads(partName, notes) {
   }
   const list = [...drums.values()].sort((a, b) => a.disp - b.disp);
   if (!list.length) list.push({ key: '_', disp: 0, kind: kindFromName(partName, true), instName: '' });
+  if (/テナー|tenor/i.test(partName) && list.length >= 4 && list.length <= 6) return makeTenorPads(list, notes);
+
+  // 横一列: 五線の位置が低い太鼓（大きい太鼓）を左に
   const named = new Set(list.map((d) => d.instName).filter(Boolean)).size === list.length;
   const pads = list.map((d, i) => ({
     label: list.length === 1 ? partName : (named ? d.instName : String(i + 1)),
     kind: d.kind,
-    tone: list.length > 1 ? i / (list.length - 1) : 0.5, // 0 = 低い 〜 1 = 高い
+    freq: 110 * Math.pow(2, (list.length > 1 ? i / (list.length - 1) : 0.5) * 1.6),
     rimRing: false,
     rimPad: false,
   }));
   if (notes.some((n) => n.rim)) {
     if (pads.length === 1) pads[0].rimRing = true;
-    else pads.push({ label: 'フチ', kind: 'rim', tone: 0.5, rimRing: false, rimPad: true });
+    else pads.push({ label: 'フチ', kind: 'rim', rimRing: false, rimPad: true });
   }
   const idx = new Map(list.map((d, i) => [d.key, i]));
   for (const n of notes) {
-    n.pad = n.rim ? (pads[0].rimRing ? 0 : pads.length - 1) : idx.get(n.padKey);
-    n.tone = pads[n.pad].tone;
+    n.pads = [n.rim ? (pads[0].rimRing ? 0 : pads.length - 1) : idx.get(n.padKey)];
+    n.freq = pads[n.pads[0]].freq;
   }
-  return pads;
+  return { pads, layout: 'row' };
+}
+
+// テナードラム: 奥に弧の形で 5・3・2・4（左→右）、中央の手前に 1・1。音程は 1:ミ 2:ド 3:ラ 4:ファ 5:レ（1が一番高い）
+const TENOR_ARC = [5, 3, 2, 4];
+const TENOR_MIDI = { 1: 64, 2: 60, 3: 57, 4: 53, 5: 50 };
+
+function makeTenorPads(list, notes) {
+  // 太鼓の番号: 楽器名に数字があればそれ、なければ五線の高い位置から 1・2・3…（6個なら上の2つが 1・1）
+  const byHigh = [...list].sort((a, b) => b.disp - a.disp);
+  byHigh.forEach((d, i) => {
+    const m = d.instName.normalize('NFKC').match(/[1-9]/);
+    const num = m ? Number(m[0]) : (list.length === 6 ? Math.max(1, i) : i + 1);
+    d.num = Math.min(5, num);
+  });
+  const pads = [...TENOR_ARC, 1, 1].map((num) => ({
+    label: String(num), num, kind: 'tom', freq: freq(TENOR_MIDI[num]), rimRing: false, rimPad: false,
+  }));
+  if (notes.some((n) => n.rim)) pads.push({ label: 'フチ', kind: 'rim', rimRing: false, rimPad: true });
+  // 1番が楽譜で2つに分かれていれば左右それぞれに、1つなら左右の両方を光らせる
+  const ones = byHigh.filter((d) => d.num === 1);
+  const padsOf = new Map();
+  for (const d of list) {
+    if (d.num === 1) padsOf.set(d.key, ones.length >= 2 ? [ones.indexOf(d) === 0 ? 4 : 5] : [4, 5]);
+    else padsOf.set(d.key, [TENOR_ARC.indexOf(d.num)]);
+  }
+  for (const n of notes) {
+    n.pads = n.rim ? [pads.length - 1] : padsOf.get(n.padKey);
+    n.freq = pads[n.pads[0]].freq;
+  }
+  return { pads, layout: 'tenor' };
 }
 
 function childText(el, sel) {
@@ -336,7 +369,7 @@ function parseMusicXML(text) {
       kind: partKind,
       perc: allPerc,
       notes: merged,
-      pads: allPerc ? makePads(rp.name, merged) : [],
+      ...(allPerc ? makePads(rp.name, merged) : { pads: [], layout: null }),
       min: pitched.length ? Math.min(...pitched.map((n) => n.midi)) : null,
       max: pitched.length ? Math.max(...pitched.map((n) => n.midi)) : null,
     };
@@ -469,8 +502,8 @@ function makeVoice(kind, midi, t, vol, dest) {
   };
 }
 
-// tone: 0 = 低い太鼓 〜 1 = 高い太鼓（テナードラムの叩き分け用）
-function playDrum(kind, t, vol, dest, tone01 = 0.5) {
+// freqHz: 太鼓の音の高さ（テナードラムなど。なければ標準の高さ）
+function playDrum(kind, t, vol, dest, freqHz) {
   const g = ctx.createGain();
   g.connect(dest);
   const noise = (hp, decay, v) => {
@@ -502,8 +535,8 @@ function playDrum(kind, t, vol, dest, tone01 = 0.5) {
     case 'bassdrum': tone(120, 45, 0.3, 1.0); break;
     case 'cymbal': noise(6000, 1.0, 0.35); break;
     case 'tom': {
-      const f = 110 * Math.pow(2, tone01 * 1.6);
-      tone(f, f * 0.7, 0.28, 0.75);
+      const f = freqHz || 150;
+      tone(f, f * 0.85, 0.3, 0.75); // 音程が分かるよう、音の下がり方は小さめ
       noise(2000, 0.06, 0.15);
       break;
     }
@@ -746,22 +779,15 @@ function setDoremi(on) {
   for (const l of $('keyboard').querySelectorAll('.label')) l.hidden = !on;
 }
 
-// 位置 q で「今おす音」と「次におす音」を光らせる
+// 位置 q で「今おす音」を光らせる
 function updateKeys(q) {
   if (!keyEls.size) return;
   const notes = state.song.parts[state.partIdx].notes;
   const on = new Set();
-  let nextQ = Infinity;
   for (const n of notes) {
     if (n.q <= q + EPS && q < n.q + n.dur * 0.95) on.add(n.midi);
-    else if (n.q > q + EPS && n.q < nextQ) nextQ = n.q;
   }
-  const next = new Set();
-  if (nextQ - q <= 2) for (const n of notes) if (Math.abs(n.q - nextQ) < EPS) next.add(n.midi);
-  for (const [m, el] of keyEls) {
-    el.classList.toggle('on', on.has(m));
-    el.classList.toggle('next', !on.has(m) && next.has(m));
-  }
+  for (const [m, el] of keyEls) el.classList.toggle('on', on.has(m));
 }
 
 // 指で押したときの音と判定（複数の指で同時に押せる）
@@ -824,9 +850,8 @@ for (const ev of ['pointerup', 'pointercancel']) {
 // =====================================================================
 // 打楽器パッド
 // =====================================================================
-let padEls = []; // { el, ring }
+let padEls = []; // { el }
 const PAD_FLASH = 0.25; // パッドが光っている長さ（拍）
-const PAD_LEAD = 1;     // 何拍前から「予告の輪」を出すか
 const RIM_RATIO = 0.16; // パッドの半径のうちフチの太さ
 
 function buildPads(part) {
@@ -835,65 +860,79 @@ function buildPads(part) {
   padEls = [];
   if (!part.perc) { box.hidden = true; return; }
   box.hidden = false;
+  box.classList.toggle('tenor', part.layout === 'tenor');
   part.pads.forEach((pad, i) => {
     const el = document.createElement('div');
     el.className = 'pad' + (pad.rimRing ? ' has-rim' : '') + (pad.rimPad ? ' rim-pad' : '');
     el.dataset.pad = i;
-    el.innerHTML = '<div class="pad-ring"></div><div class="pad-head"><span class="pad-accent">＞</span><span class="pad-label"></span></div>';
+    el.innerHTML = '<div class="pad-head"><span class="pad-accent">＞</span><span class="pad-label"></span></div>';
     el.querySelector('.pad-label').textContent = pad.label;
     box.appendChild(el);
-    padEls.push({ el, ring: el.querySelector('.pad-ring') });
+    padEls.push({ el });
   });
   requestAnimationFrame(sizePads);
 }
 
-// パッドの大きさ: 横に全部ならび、高さにもおさまる一番大きい円
+// パッドの大きさと位置を、パッドの欄の大きさに合わせて決める
 function sizePads() {
   const box = $('pads');
   if (!padEls.length || box.hidden) return;
-  const gap = 12;
-  const n = padEls.length;
-  const size = Math.max(40, Math.min(box.clientHeight - 20, (box.clientWidth - 24 - gap * (n - 1)) / n));
-  for (const { el } of padEls) {
+  const part = state.song.parts[state.partIdx];
+  const W = box.clientWidth, H = box.clientHeight;
+  const gap = 10;
+  const place = (el, size, left, top, fontRatio) => {
     el.style.width = el.style.height = size + 'px';
+    el.style.left = left == null ? '' : left + 'px';
+    el.style.top = top == null ? '' : top + 'px';
     el.style.setProperty('--rim', el.classList.contains('has-rim') || el.classList.contains('rim-pad') ? Math.round(size / 2 * RIM_RATIO) + 'px' : '3px');
-    el.style.fontSize = Math.max(12, Math.min(22, size / 6)) + 'px';
+    el.style.fontSize = Math.max(12, Math.min(40, size * fontRatio)) + 'px';
+  };
+
+  if (part.layout === 'tenor') {
+    // 奥に弧（左から 5・3・2・4。外側ほど手前に下げる）、中央の手前に 1・1
+    const s = Math.max(36, Math.min((H - 20) / 1.8, (W - 24 - gap * 3) / 4));
+    const s1 = s * 0.75;
+    const cx = W / 2;
+    const top0 = 6;
+    const arcDrop = [0.35, 0, 0, 0.35];
+    const frontTop = top0 + s + 4;
+    padEls.forEach(({ el }, i) => {
+      if (i < 4) {
+        place(el, s, cx + (i - 1.5) * (s + gap) - s / 2, top0 + arcDrop[i] * s, 0.32);
+      } else if (i < 6) {
+        const c = cx + (i === 4 ? -1 : 1) * (s1 / 2 + gap / 2);
+        place(el, s1, c - s1 / 2, frontTop, 0.32);
+      } else {
+        place(el, s1 * 0.8, W - s1 * 0.8 - 8, H - s1 * 0.8 - 8, 0.18); // フチ専用（右下）
+      }
+    });
+    return;
   }
+
+  // 横一列: 全部ならび、高さにもおさまる一番大きい円
+  const n = padEls.length;
+  const size = Math.max(40, Math.min(H - 20, (W - 24 - 12 * (n - 1)) / n));
+  for (const { el } of padEls) place(el, size, null, null, 1 / 6);
 }
 
-// 位置 q で、叩くパッドを光らせ、次に叩くパッドには輪をちぢめて予告する
+// 位置 q で、今叩くパッドを光らせる
 function updatePads(q) {
   if (!padEls.length) return;
   const part = state.song.parts[state.partIdx];
-  const st = padEls.map(() => ({ on: false, rim: false, accent: false, next: Infinity, nextAccent: false, nextRim: false }));
+  const st = padEls.map(() => ({ on: false, rim: false, accent: false }));
   for (const n of part.notes) {
-    const s = st[n.pad];
-    if (!s) continue;
-    if (n.q <= q + EPS && q < n.q + Math.min(PAD_FLASH, n.dur)) {
-      if (n.rim && part.pads[n.pad].rimRing) s.rim = true; else s.on = true;
+    if (!(n.q <= q + EPS && q < n.q + Math.min(PAD_FLASH, n.dur))) continue;
+    for (const i of n.pads) {
+      const s = st[i];
+      if (!s) continue;
+      if (n.rim && part.pads[i].rimRing) s.rim = true; else s.on = true;
       if (n.accent) s.accent = true;
-    } else if (n.q > q + EPS && n.q < s.next - EPS) {
-      s.next = n.q; s.nextAccent = n.accent; s.nextRim = n.rim;
-    } else if (Math.abs(n.q - s.next) < EPS) {
-      s.nextAccent = s.nextAccent || n.accent; s.nextRim = s.nextRim || n.rim;
     }
   }
-  padEls.forEach(({ el, ring }, i) => {
-    const s = st[i];
-    const d = s.next - q;
-    const soon = d <= PAD_LEAD;
-    el.classList.toggle('on', s.on);
-    el.classList.toggle('rim-on', s.rim);
-    el.classList.toggle('accent', s.accent);
-    // 「＞」は、今叩いている音がアクセントのとき、または何も叩いていなくて次がアクセントのときに出す
-    el.classList.toggle('accent-show', s.accent || (!s.on && !s.rim && soon && s.nextAccent));
-    ring.classList.toggle('to-rim', soon && s.nextRim);
-    if (soon) {
-      ring.style.opacity = String(0.35 + 0.65 * (1 - d / PAD_LEAD));
-      ring.style.transform = `scale(${1 + d * 0.4})`;
-    } else {
-      ring.style.opacity = '0';
-    }
+  padEls.forEach(({ el }, i) => {
+    el.classList.toggle('on', st[i].on);
+    el.classList.toggle('rim-on', st[i].rim);
+    el.classList.toggle('accent', st[i].accent);
   });
 }
 
@@ -909,14 +948,14 @@ function hitPad(e) {
   const r = el.getBoundingClientRect();
   const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
   const rim = pad.rimPad || (pad.rimRing && dist > (r.width / 2) * (1 - RIM_RATIO));
-  playDrum(rim ? 'rim' : pad.kind, ctx.currentTime, 0.6, master, pad.tone);
+  playDrum(rim ? 'rim' : pad.kind, ctx.currentTime, 0.6, master, pad.freq);
   el.classList.add('pressed');
   setTimeout(() => el.classList.remove('pressed'), 120);
   if (player.playing) {
     // 叩くタイミングの前後 0.15 秒以内なら「あたり」
     const q = currentQ();
     const tol = 0.15 * player.bps;
-    const ok = part.notes.some((n) => n.pad === i && n.rim === (rim || !!pad.rimPad) && Math.abs(n.q - q) <= tol);
+    const ok = part.notes.some((n) => n.pads.includes(i) && n.rim === rim && Math.abs(n.q - q) <= tol);
     el.classList.remove('good', 'miss');
     void el.offsetWidth;
     el.classList.add(ok ? 'good' : 'miss');
@@ -1052,7 +1091,7 @@ function fire(e, t) {
   if (e.type === 'click') { playClick(t, e.accent, player.bus); return; }
   const n = e.n;
   if (n.perc) {
-    playDrum(n.rim ? 'rim' : n.kind, t, e.vol * (n.accent ? 1.7 : 1), player.bus, n.tone);
+    playDrum(n.rim ? 'rim' : n.kind, t, e.vol * (n.accent ? 1.7 : 1), player.bus, n.freq);
     return;
   }
   const v = makeVoice(n.kind, n.midi, t, e.vol, player.bus);

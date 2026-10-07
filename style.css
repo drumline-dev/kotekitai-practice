@@ -7,7 +7,6 @@
   --brand-ink: #ffffff;
   --line: #d5dce6;
   --on: #ff9f1c;      /* 今おす鍵盤 */
-  --next: #ffe2b3;    /* 次におす鍵盤 */
   --good: #3cb371;
   --miss: #e5534b;
 }
@@ -149,8 +148,6 @@ button.link:empty { display: none; }
   pointer-events: none;
 }
 .key.black .label { color: #ccc; font-size: .6rem; }
-.key.next.white { background: var(--next); }
-.key.next.black { background: #8a6a3a; }
 .key.on.white, .key.on.black { background: var(--on); }
 .key.pressed { filter: brightness(.85); }
 .key.good { box-shadow: inset 0 0 0 4px var(--good); }
@@ -170,9 +167,12 @@ button.link:empty { display: none; }
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-  overflow: hidden; /* 予告の輪が上の欄にはみ出さないように */
+  overflow: hidden;
 }
 #pads[hidden] { display: none; }
+/* テナードラム: パッドを自由な位置に置くので、欄を広めにとる */
+#pads.tenor { display: block; position: relative; flex-basis: 52%; max-height: 380px; }
+#pads.tenor .pad { position: absolute; }
 .pad {
   --rim: 3px;
   position: relative;
@@ -195,7 +195,7 @@ button.link:empty { display: none; }
 .pad.rim-pad .pad-head { background: #3a3f47; color: #ddd; } /* フチ専用パッドはドーナツ形 */
 .pad-label { padding: 0 6px; }
 .pad-accent { display: none; color: var(--miss); font-size: 1.6em; line-height: 1; }
-.pad.accent-show .pad-accent { display: block; }
+.pad.accent .pad-accent { display: block; }
 .pad.on .pad-head { background: var(--on); }
 .pad.on.accent .pad-head { background: var(--miss); color: #fff; }
 .pad.on.accent .pad-accent { color: #fff; }
@@ -204,16 +204,6 @@ button.link:empty { display: none; }
 .pad.pressed .pad-head { filter: brightness(.85); }
 .pad.good { box-shadow: 0 0 0 6px var(--good); }
 .pad.miss { box-shadow: 0 0 0 6px var(--miss); }
-.pad-ring {
-  position: absolute;
-  inset: calc(-1 * var(--rim));
-  border-radius: 50%;
-  border: 4px solid var(--on);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 2;
-}
-.pad-ring.to-rim { border-style: dashed; border-color: #ffd36b; }
 
 /* ---------- せってい ---------- */
 .panel {
